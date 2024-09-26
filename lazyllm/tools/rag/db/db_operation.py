@@ -50,6 +50,9 @@ class DBOperations(metaclass=CustomMeta):
         with cls.session() as db_session:
             db_session.add(node)
             db_session.commit()
+            db_session.refresh(node)
+            db_session.expunge(node)
+            return node
 
     @classmethod
     def add_or_replace_node(cls, node: T, **kwargs):
@@ -64,14 +67,15 @@ class DBOperations(metaclass=CustomMeta):
         Returns:
             Optional[T]: The created node or None if the operation fails.
         """
+        cls.del_node(**kwargs)
         with cls.session() as db_session:
-            # Check if a node matching the filter conditions exists
-            filter_conditions = cls._get_filter_conditions(**kwargs)
-            existing_node = db_session.query(cls).filter(and_(*filter_conditions)).first()
-            if existing_node:
-                # Delete the existing node
-                db_session.delete(existing_node)
-                db_session.commit()
+            # # Check if a node matching the filter conditions exists
+            # filter_conditions = cls._get_filter_conditions(**kwargs)
+            # existing_node = db_session.query(cls).filter(and_(*filter_conditions)).first()
+            # if existing_node:
+            #     # Delete the existing node
+            #     db_session.delete(existing_node)
+            #     db_session.commit()
 
             # Add the new node
             db_session.add(node)

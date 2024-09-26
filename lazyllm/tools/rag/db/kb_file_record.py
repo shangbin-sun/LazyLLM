@@ -29,6 +29,7 @@ class KBFileRecord(DB.Base, DBOperations, metaclass=DBMergeClass, session=DB.ses
     id = Column(Integer, primary_key=True, autoincrement=True, comment='Knowledge Base ID')
     kb_name = Column(String(50), comment='Knowledge Base Name')
     file_id = Column(String(36), comment='File ID')
+    file_name = Column(String(50), comment='File Name')
     create_time = Column(DateTime, default=func.now(), comment='Creation Time')
     state = Column(SQLEnum(FileState), nullable=False, default=FileState.WAIT_PARSE)
 
@@ -36,21 +37,21 @@ class KBFileRecord(DB.Base, DBOperations, metaclass=DBMergeClass, session=DB.ses
         """
         String representation of the KBFileRecord instance.
         """
-        return (f"<KBFileRecord(id='{self.id}', kb_name='{self.kb_name}', "
+        return (f"<KBFileRecord(id='{self.id}', kb_name='{self.kb_name}', file_id='{self.file_id}'"
                 f"state={self.state}, create_time='{self.create_time}')>")
 
     @classmethod
-    def get_file_path_by_kb_name(cls, **kwargs) -> List[str]:
+    def get_file_path_by_kb_name(cls, kb_name: str) -> List[str]:
         """
         Get all file names and paths for a given knowledge base name.
         """
         with cls.session() as db_session:
-            results = db_session.query(FileRecord.file_name, FileRecord.file_path)\
+            results = db_session.query(FileRecord.file_path)\
                                 .join(KBFileRecord, KBFileRecord.file_id == FileRecord.id)\
-                                .filter_by(**kwargs)\
+                                .filter(KBFileRecord.kb_name == kb_name)\
                                 .all()
-            files = [os.path.join(file_path, file_name) for file_name, file_path in results]
-        return files
+            file_paths = [path for res in results for path in res]
+        return file_paths
     
     @classmethod
     def get_file_id_by_kb_name(cls, kb_name: str) -> List[Integer]:
@@ -59,7 +60,7 @@ class KBFileRecord(DB.Base, DBOperations, metaclass=DBMergeClass, session=DB.ses
         """
         with cls.session() as db_session:
             results = db_session.query(FileRecord.id)\
-                                .join(KBFileRecord, KBFileRecord.file_id == FileRecord.id)\
+                                .join(FileRecord, KBFileRecord.file_id == FileRecord.id)\
                                 .filter(KBFileRecord.kb_name == kb_name)\
                                 .all()
             results = [id for res in results for id in res]

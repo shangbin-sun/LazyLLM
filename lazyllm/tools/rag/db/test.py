@@ -92,16 +92,16 @@ def test_multi_value_filter(): # 多值查询
 
 
 def test_get_file_path_by_kb_name():
-    FileRecord.del_node(file_path = "path")
-    KBFileRecord.del_node(kb_name="test_kbname")
+    FileRecord.del_node(file_path = "test_kbname1")
+    KBFileRecord.del_node(kb_name="test_kbname2")
     
-    FileRecord.create(id=110, file_name = "test_file_name", file_path = "path", file_type = "txt", file_size = 1)
-    KBFileRecord.create(kb_name="test_kbname", file_id=110, state=FileState.PARSED)
+    FileRecord.create(id=110, file_name = "test_file_name", file_path = "path1", file_type = "TXT", file_size = 1)
+    KBFileRecord.create(kb_name="test_kbname1", file_id=110, state=FileState.PARSED)
     
-    FileRecord.create(id=120, file_name = "test_file_name2", file_path = "path", file_type = "txt", file_size = 1)
-    KBFileRecord.create(kb_name="test_kbname", file_id=120, state=FileState.PARSED)
+    FileRecord.create(id=120, file_name = "test_file_name2", file_path = "path2", file_type = "TXT", file_size = 1)
+    KBFileRecord.create(kb_name="test_kbname2", file_id=120, state=FileState.WAIT_PARSE)
 
-    assert KBFileRecord.get_file_path_by_kb_name(kb_name="test_kbname", state=FileState.PARSED) == ['path/test_file_name', 'path/test_file_name2']
+    assert KBFileRecord.get_file_path_by_kb_name(kb_name="test_kbname1") == ['path1']
 
 def test_get_file_id_by_kb_name():
     FileRecord.del_node(file_path = "path")

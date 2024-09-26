@@ -10,6 +10,8 @@ from lazyllm import FastapiApp as app
 from ..utils import BaseResponse
 from ..document import Document
 from .kb_server import KBServer, DocCreater
+import lazyllm
+from lazyllm import ServerModule
 
 PipelineCreater = Callable[[str, List[Document]], Tuple[FlowBase, FlowBase]]
 

@@ -83,9 +83,78 @@ elif STORE_MODE == "minio":
         secret=minio_secret_key,
         client_kwargs={'endpoint_url': minio_endpoint}
     )
-    
 
-class FileServer:
+class FileManageBase:
+    def _upload_file(self, file: UploadFile, forder_path: str = '', is_overwrite: bool = True):
+        """
+        Upload a file to the server.
+        """
+        try:
+            file_path = os.path.join(forder_path, file.filename)
+            file_info = FileRecord.first(file_path=file_path)
+            if file_info and not is_overwrite:
+                # return BaseResponse(msg="File already exists and will not be overwritten.")
+                return 
+            
+            if file_info and is_overwrite:
+                FileRecord.del_node(file_path=file_path)
+            
+            # 删除文件
+            if fs.exists(file_path):
+                fs.rm(file_path)
+            # 保存文件
+            with fs.open(file_path, "wb") as file_object:
+                file_object.write(file.file.read())
+
+            file_info = FileRecord(
+                file_name=file.filename,
+                file_path=file_path,
+                file_type=os.path.splitext(file.filename)[1][1:].upper(),
+                file_size=file.size
+            )
+            node = FileRecord.add_node(file_info)
+            return node
+        except Exception as e:
+            raise e
+    
+    def _create_folder(self, folder_path: str = None, add_file_node = False):
+        """
+        Create a new folder.
+        """
+        try:
+            if not fs.exists(folder_path):
+                fs.mkdir(folder_path)
+            if add_file_node:
+                node = FileRecord.create(
+                    file_name=folder_path,
+                    file_path=folder_path,
+                    file_type=FORDER_TYPE,
+                    file_size=0
+                )
+                return node
+        except Exception as e:
+            raise e
+    
+    def _delete_file(self, file_id: int):
+        """
+        Delete a file by its ID.
+        """
+        file_record = FileRecord.first(id=file_id)
+        if not file_record:
+            raise Exception("File not found")
+        
+        try:
+            fs.rm(file_record.file_path)
+        except Exception as e:
+            logger.error(f"Failed to delete file {file_record.file_path}: {str(e)}")
+        
+        try:
+            FileRecord.del_node(id=file_id)
+        except Exception as e:
+            logger.error(f"Failed to delete file record {file_id}: {str(e)}")
+            
+
+class FileServer(FileManageBase):
     """
     File server for managing file operations.
     """
@@ -109,54 +178,29 @@ class FileServer:
             else:
                 file_tree.append(files_dict[file.file_path])
         return file_tree
-
+    
     @app.post("/create_folder")
     def create_folder(self, folder_path: str = None) -> BaseResponse:
         """
         Create a new folder.
         """
         try:
-            if not fs.exists(folder_path):
-                fs.mkdir(folder_path)
-            node = FileRecord.create(
-                file_name=folder_path,
-                file_path=folder_path,
-                file_type=FORDER_TYPE,
-                file_size=0
-            )
+            node = self._create_folder(folder_path=folder_path, add_file_node=True)
             return BaseResponse(msg=f"Folder '{folder_path}' created successfully.", data_id=node.id)
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
-
+    
     @app.post("/upload_file")
     async def upload_file(self, file: UploadFile = File(...), forder_path: str = '', is_overwrite: bool = True) -> BaseResponse:
         """
         Upload a file to the server.
         """
         try:
-            file_path = os.path.join(forder_path, file.filename)
-            file_info = FileRecord.first(file_path=file_path)
-            if file_info and not is_overwrite:
-                return BaseResponse(msg="File already exists and will not be overwritten.")
-            
-            if file_info and is_overwrite:
-                FileRecord.del_node(file_path=file_path)
-            
-            # 删除文件
-            if fs.exists(file_path):
-                fs.rm(file_path)
-            # 保存文件
-            with fs.open(file_path, "wb") as file_object:
-                file_object.write(file.file.read())
-
-            file_info = FileRecord(
-                file_name=file.filename,
-                file_path=file_path,
-                file_type=os.path.splitext(file.filename)[1][1:].upper(),
-                file_size=file.size
-            )
-            FileRecord.add_node(file_info)
-            return BaseResponse(msg=f"File '{file.filename}' uploaded successfully.")
+            node = self._upload_file(file=file, forder_path=forder_path, is_overwrite=is_overwrite)
+            if node:
+                return BaseResponse(msg=f"File '{node.file_name}' uploaded successfully.")
+            else:
+                BaseResponse(msg="File already exists and will not be overwritten.")
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
 
@@ -192,20 +236,10 @@ class FileServer:
         """
         Delete a file by its ID.
         """
-        file_record = FileRecord.first(id=file_id)
-        if not file_record:
-            raise HTTPException(status_code=404, detail="File not found")
-        
         try:
-            os.remove(file_record.file_path)
+            self._delete_file(file_id)
         except Exception as e:
-            logger.error(f"Failed to delete file {file_record.file_path}: {str(e)}")
-        
-        try:
-            FileRecord.del_node(id=file_id)
-        except Exception as e:
-            logger.error(f"Failed to delete file record {file_id}: {str(e)}")
-
+            raise HTTPException(status_code=404, detail=str(e))
         return BaseResponse(msg=f"File ID {file_id} deleted successfully.")
     
     @app.get("/get_file_tree")
