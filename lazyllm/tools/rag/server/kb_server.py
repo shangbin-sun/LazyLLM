@@ -147,7 +147,12 @@ class KBServer(KBServerBase):
         Deletes an existing knowledge base.
         """
         KBInfoRecord.del_node(kb_name=kb_name)
-
+        
+        KBFileRecord.update(
+                fun=lambda x: x.set(state=FileState.WAIT_DELETE), 
+                kb_name=kb_name
+            )
+        
         files = KBFileRecord.all(kb_name=kb_name)
         for file in files:
             self.delete_file(kb_name=kb_name, file_id=file.id)
